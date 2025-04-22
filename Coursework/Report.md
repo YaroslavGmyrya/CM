@@ -71,11 +71,11 @@
 
 using namespace std;
 
-double a(int t){
+double a(int t) {
     return 2.5;
 }
 
-double c(int t){
+double c(int t) {
     return 1 + c_isol * (1 - ((2 * a(t)) / 5));
 }
 
@@ -89,36 +89,65 @@ void derivatives(double t, const std::vector<double>& y, std::vector<double>& dy
     dydt[4] = u * I;
 }
 
-
-void euler(double t_start, double t_end, int steps, std::vector<double>& y) {
-    double h = (t_end - t_start) / steps;
-    std::vector<double> dydt(5); 
-
-    for (int i = 0; i < steps; ++i) {
-        double t = t_start + i * h;
-        derivatives(t, y, dydt);
+void adaptive_euler(double t_start, double t_end, double epsilon, std::vector<double>& y) {
+    double t = t_start;
+    double h = 1.0; 
+    std::vector<double> dydt(5);
+    std::vector<double> y_temp(5), y_half(5), y_full(5);
+    
+    while (t < t_end) {
+        
+        y_temp = y;
+        y_half = y;
+        y_full = y;
+        
+        derivatives(t, y_temp, dydt);
         
         for (int j = 0; j < 5; ++j) {
-            y[j] += h * dydt[j];
+            y_full[j] += h * dydt[j];
+        }
+        
+        for (int j = 0; j < 5; ++j) {
+            y_half[j] += (h/2) * dydt[j];
+        }
+
+        derivatives(t + h/2, y_half, dydt);
+
+        for (int j = 0; j < 5; ++j) {
+            y_half[j] += (h/2) * dydt[j];
+        }
+        
+        double error = 0.0;
+
+        for (int j = 0; j < 5; ++j) {
+            error = max(error, abs(y_full[j] - y_half[j]));
+        }
+        
+        if (error < epsilon) {
+            y = y_half; 
+            t += h;
+            h *= 1.5;
+        } else {
+            h *= 0.5;
+            continue;
         }
     }
 }
 
-int main(){
-
+int main() {
     std::vector<double> y = {
         N - 50 - 10,  // S0 = N - E0 - I0 - R0 - D0
-        0,           // E0
+        0,            // E0
         10,           // I0
         0,            // R0
-        1             // D0
+        0             // D0
     };
 
     double t_start = 0.0;
     double t_end = 90.0;
-    int steps = 90;  
+    double epsilon = 0.01; 
 
-    euler(t_start, t_end, steps, y);
+    adaptive_euler(t_start, t_end, epsilon, y);
 
     cout << fixed << setprecision(2);
     cout << "Результаты на день " << t_end << ":\n";
